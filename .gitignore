@@ -30,3 +30,24 @@ frontend/*
 
 # DS Store
 .DS_Store
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+.env/
+
+# Environment variables
+.env
+
+# Local metadata
+metadata_store.json
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

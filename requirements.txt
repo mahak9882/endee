@@ -1,0 +1,7 @@
+sentence-transformers
+pypdf
+openai
+tqdm
+python-dotenv
+requests
+msgpack
