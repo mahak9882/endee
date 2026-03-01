@@ -1,385 +1,208 @@
-# Endee: High-Performance Open Source Vector Database
+# 📚 Research RAG System using Endee Vector Database
 
-**Endee (nD)** is a specialized, high-performance vector database built for speed and efficiency. This guide covers supported platforms, dependency requirements, and detailed build instructions using both our automated installer and manual CMake configuration.
+A Retrieval-Augmented Generation (RAG) pipeline for research paper question answering built with:
 
-there are 3 ways to build and run endee:
-1. quick installation and run using install.sh and run.sh scripts
-2. manual build using cmake
-3. using docker
-
-also you can run endee using docker from docker hub without building it locally. refer to section 4 for more details.
+- 🧠 SentenceTransformers (MiniLM embeddings)
+- ⚡ Endee Vector Database
+- 📄 PDF ingestion & chunking
+- 🔍 Semantic search over research papers
 
 ---
 
-## System Requirements
+## 🚀 Overview
 
-Before installing, ensure your system meets the following hardware and operating system requirements.
+This project implements a full Retrieval-Augmented Generation (RAG) backend pipeline that allows users to:
 
-### Supported Operating Systems
+1. Ingest research papers (PDFs)
+2. Chunk and embed text using SentenceTransformers
+3. Store embeddings in an Endee vector database
+4. Perform semantic search over documents
+5. Retrieve the most relevant text chunks for a query
 
-* **Linux**: Ubuntu(22.04, 24.04, 25.04) Debian(12, 13), Rocky(8, 9, 10), Centos(8, 9, 10), Fedora(40, 42, 43)
-* **macOS**: Apple Silicon (M Series) only.
-
-### Required Dependencies
-
-The following packages are required for compilation.
-
- `clang-19`, `cmake`, `build-essential`, `libssl-dev`, `libcurl4-openssl-dev`
-
-> **Note:** The build system requires **Clang 19** (or a compatible recent Clang version) supporting C++20.
+The system forms the retrieval backbone for a research assistant.
 
 ---
 
-## 1. Quick Installation (Recommended)
-
-The easiest way to build **ndd** is using the included `install.sh` script. This script handles OS detection, dependency checks, and configuration automatically.
-
-### Usage
-
-First, ensure the script is executable:
-```bash
-chmod +x ./install.sh
-```
-
-Run the script from the root of the repository. You **must** provide arguments for the build mode and/or CPU optimization.
-
-```bash
-./install.sh [BUILD_MODE] [CPU_OPTIMIZATION]
-```
-
-### Build Arguments
-
-You can combine one **Build Mode** and one **CPU Optimization** flag.
-
-#### Build Modes
-
-| Flag | Description | CMake Equivalent |
-| --- | --- | --- |
-| `--release` | **Default.** Optimized release build. |  |
-| `--debug_all` | Enables full debugging symbols. | `-DND_DEBUG=ON -DDEBUG=ON` |
-| `--debug_nd` | Enables NDD-specific logging/timing. | `-DND_DEBUG=ON` |
-
-#### CPU Optimization Options
-
-Select the flag matching your hardware to enable SIMD optimizations.
-
-| Flag | Description | Target Hardware |
-| --- | --- | --- |
-| `--avx2` | Enables AVX2 (FMA, F16C) | Modern x86_64 Intel/AMD |
-| `--avx512` | Enables AVX512 (F, BW, VNNI, FP16) | Server-grade x86_64 (Xeon/Epyc) |
-| `--neon` | Enables NEON (FP16, DotProd) | Apple Silicon / ARMv8.2+ |
-| `--sve2` | Enables SVE2 (INT8/16, FP16) | ARMv9 / SVE2 compatible |
-
-> **Note:** The `--avx512` build configuration enforces mandatory runtime checks for specific instruction sets. To successfully run this build, your CPU must support **`avx512` (Foundation), `avx512_fp16`, `avx512_vnni`, `avx512bw`, and `avx512_vpopcntdq`**; if any of these extensions are missing, the database will fail to initialize and exit immediately to avoid runtime crashes.
-
-
-### Example Commands
-
-**Build for Production (Intel/AMD with AVX2):**
-
-```bash
-./install.sh --release --avx2
-```
-
-**Example Build for Debugging (Apple Silicon):**
-
-```bash
-./install.sh --debug_all --neon
-```
-
-### Running the Server
-
-We provide a `run.sh` script to simplify running the server. It automatically detects the built binary and uses `ndd_data_dir=./data` by default.
-
-First, ensure the script is executable:
-
-```bash
-chmod +x ./run.sh
-```
-
-Then run the script:
-
-```bash
-./run.sh
-```
-
-This will automatically identify the latest binary and start the server.
-
-#### Options
-
-You can override the defaults using arguments:
-
-*   `ndd_data_dir=DIR`: Set the data directory.
-*   `binary_file=FILE`: Set the binary file to run.
-*   `ndd_auth_token=TOKEN`: Set the authentication token (leave empty/ignore to run without authentication).
-
-#### Examples
-
-**Run with custom data directory:**
-
-```bash
-./run.sh ndd_data_dir=./my_data
-```
-
-**Run specific binary:**
-
-```bash
-./run.sh binary_file=./build/ndd-avx2
-```
-
-**Run with authentication token:**
-
-```bash
-./run.sh ndd_auth_token=your_token
-```
-
-
-**Run with all options**
-
-```bash
-./run.sh ndd_data_dir=./my_data binary_file=./build/ndd-avx2 ndd_auth_token=your_token
-```
-
-**For Help**
-
-```bash
-./run.sh --help
-```
-
-
-## 2. Manual Build (Advanced)
-
-If you prefer to configure the build manually or integrate it into an existing install pipeline, you can use `cmake` directly.
-
-### Step 1: Prepare Build Directory
-
-```bash
-mkdir build && cd build
-```
-
-### Step 2: Configure
-
-Run `cmake` with the appropriate flags. You must manually define the compiler if it is not your system default.
-
-**Configuration Flags:**
-
-* **Debug Options:**
-* `-DDEBUG=ON` (Enable debug symbols/O0)
-* `-DND_DEBUG=ON` (Enable internal logging)
-
-
-* **SIMD Selectors (Choose One):**
-* `-DUSE_AVX2=ON`
-* `-DUSE_AVX512=ON`
-* `-DUSE_NEON=ON`
-* `-DUSE_SVE2=ON`
-
-
-**Example (x86_64 AVX512 Release):**
-
-```bash
-cmake -DCMAKE_BUILD_TYPE=Release \
-      -DUSE_AVX512=ON \
-      ..
-```
-
-### Step 3: Compile
-
-```bash
-make -j$(nproc)
-```
-
-### Running the Built Binary
-
-After a successful build, the binary will be generated in the `build/` directory.
-
-### Binary Naming
-
-The output binary name depends on the SIMD flag used during compilation:
-
-* `ndd-avx2`
-* `ndd-avx512`
-* `ndd-neon` (or `ndd-neon-darwin` for mac)
-* `ndd-sve2`
-
-A symlink called `ndd` links to the binary compiled for the current build.
-
-### Runtime Environment Variables
-
-Some environment variables **ndd** reads at runtime:
-
-* `NDD_DATA_DIR`: Defines the data directory
-* `NDD_AUTH_TOKEN`: Optional authentication token (see below)
-
-### Authentication
-
-**ndd** supports two authentication modes:
-
-**Open Mode (No Authentication)** - Default when `NDD_AUTH_TOKEN` is not set:
-```bash
-# All APIs work without authentication
-./build/ndd
-curl http://{{BASE_URL}}/api/v1/index/list
-```
-
-**Token Mode** - When `NDD_AUTH_TOKEN` is set:
-```bash
-# Generate a secure token
-export NDD_AUTH_TOKEN=$(openssl rand -hex 32)
-./build/ndd
-
-# All protected APIs require the token in Authorization header
-curl -H "Authorization: $NDD_AUTH_TOKEN" http://{{BASE_URL}}/api/v1/index/list
-```
-
-### Execution Example
-
-To run the database using the AVX2 binary and a local `data` folder:
-
-```bash
-# 1. Create the data directory
-mkdir -p ./data
-
-# 2. Export the environment variable and run
-export NDD_DATA_DIR=$(pwd)/data
-./build/ndd
-```
-
-Alternatively, as a single line:
-
-```bash
-NDD_DATA_DIR=./data ./build/ndd
-```
+## 🏗 Architecture
+# 📚 Research RAG System using Endee Vector Database
+
+A Retrieval-Augmented Generation (RAG) pipeline for research paper question answering built with:
+
+- 🧠 SentenceTransformers (MiniLM embeddings)
+- ⚡ Endee Vector Database
+- 📄 PDF ingestion & chunking
+- 🔍 Semantic search over research papers
 
 ---
 
+## 🚀 Overview
 
+This project implements a full Retrieval-Augmented Generation (RAG) backend pipeline that allows users to:
 
-## 3. Docker Deployment
+1. Ingest research papers (PDFs)
+2. Chunk and embed text using SentenceTransformers
+3. Store embeddings in an Endee vector database
+4. Perform semantic search over documents
+5. Retrieve the most relevant text chunks for a query
 
-We provide a Dockerfile for easy containerization. This ensures a consistent runtime environment and simplifies the deployment process across various platforms.
-
-### Build the Image
-
-You **must** specify the target architecture (`avx2`, `avx512`, `neon`, `sve2`) using the `BUILD_ARCH` build argument. You can optionally enable a debug build using the `DEBUG` argument.
-
-```bash
-# Production Build (AVX2) (for x86_64 systems)
-docker build --ulimit nofile=100000:100000 --build-arg BUILD_ARCH=avx2 -t endee-oss:latest -f ./infra/Dockerfile .
-
-# Debug Build (Neon) (for arm64, mac apple silicon)
-docker build --ulimit nofile=100000:100000 --build-arg BUILD_ARCH=neon --build-arg DEBUG=true -t endee-oss:latest -f ./infra/Dockerfile .
-```
-
-### Run the Container
-
-The container exposes port `8080` and stores data in `/data` inside container. You should persist this data using a docker volume.
-
-```bash
-docker run \
-  -p 8080:8080 \
-  -v endee-data:/data \
-  -e NDD_AUTH_TOKEN="your_secure_token" \
-  --name endee-server \
-  endee-oss:latest
-```
-
-leave `NDD_AUTH_TOKEN` empty or remove it to run endee without authentication.
-
-### Alternatively: Docker Compose
-
-You can also use `docker-compose` to run the service.
-
-1. Start the container:
-   ```bash
-   docker-compose up
-   ```
+The system forms the retrieval backbone for a research assistant.
 
 ---
 
-## 4. Running Docker container from registry
+## 🏗 Architecture
+# 📚 Research RAG System using Endee Vector Database
 
-You can run Endee directly using the pre-built image from Docker Hub without building locally.
+A Retrieval-Augmented Generation (RAG) pipeline for research paper question answering built with:
 
-### Using Docker Compose
+- 🧠 SentenceTransformers (MiniLM embeddings)
+- ⚡ Endee Vector Database
+- 📄 PDF ingestion & chunking
+- 🔍 Semantic search over research papers
 
-Create a new directory for Endee:
+---
 
-```bash
-mkdir endee && cd endee
-```
+## 🚀 Overview
 
-Inside this directory, create a file named `docker-compose.yml` and copy the following content into it:
+This project implements a full Retrieval-Augmented Generation (RAG) backend pipeline that allows users to:
 
-```yaml
-services:
-  endee:
-    image: endeeio/endee-server:latest
-    container_name: endee-server
-    ports:
-      - "8080:8080"
-    environment:
-      NDD_NUM_THREADS: 0
-      NDD_AUTH_TOKEN: ""  # Optional: set for authentication
-    volumes:
-      - endee-data:/data
-    restart: unless-stopped
+1. Ingest research papers (PDFs)
+2. Chunk and embed text using SentenceTransformers
+3. Store embeddings in an Endee vector database
+4. Perform semantic search over documents
+5. Retrieve the most relevant text chunks for a query
 
-volumes:
-  endee-data:
-```
+The system forms the retrieval backbone for a research assistant.
+
+---
+
+## 🏗 Architecture
+
+<img width="1920" height="1080" alt="Screenshot 2026-03-01 155003" src="https://github.com/user-attachments/assets/f963c141-cc92-4769-95f6-e461212c9206" />
+<img width="1920" height="1080" alt="Screenshot 2026-03-01 155012" src="https://github.com/user-attachments/assets/a2adac6c-d3d9-47ea-b5da-aff9c441fa00" />
+PDF → Text Extraction → Chunking → Embedding → Endee Vector DB
+↑
+Query → Embedding → Vector Search → Top-k Retrieval → Text Output
+---
+
+## 📂 Project Structure
+
+
+research_rag/
+│
+├── ingest.py # PDF ingestion and vector storage
+├── query.py # Semantic search interface
+├── utils.py # PDF extraction utilities
+├── init.py
+│
+reset_index.py # Script to reset vector index
+requirements.txt
+README.md
+.gitignore
+
+
+---
+
+## ⚙️ Installation
+
+### 1️⃣ Clone Repository
+
+git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+cd YOUR_REPO_NAME
+2️⃣ Create Virtual Environment
+python -m venv venv
+venv\Scripts\activate   # Windows
+3️⃣ Install Dependencies
+pip install -r requirements.txt
+4️⃣ Start Endee Server (Docker)
+docker run -d -p 8080:8080 --name endee-server endeeio/endee-server:latest
+📥 Ingest Research Papers
+
+Place PDFs inside:
+
+data/papers/
 
 Then run:
-```bash
-docker compose up -d
-```
 
-for more details visit [docs.endee.io](https://docs.endee.io/quick-start)
+python -m research_rag.ingest
 
----
+This will:
 
-## Contribution
+Extract text
 
-We welcome contributions from the community to help make vector search faster and more accessible for everyone. To contribute:
+Chunk with overlap
 
-* **Submit Pull Requests**: Have a fix or a new feature? Fork the repo, create a branch, and send a PR.
-* **Report Issues**: Found a bug or a performance bottleneck? Open an issue on GitHub with steps to reproduce it.
-* **Suggest Improvements**: We are always looking to optimize performance; feel free to suggest new CPU target optimizations or architectural enhancements.
-* **Feature Requests**: If there is a specific functionality you need, start a discussion in the issues section.
+Generate embeddings
 
----
+Store vectors in Endee
 
-## License
+Save metadata locally
 
-Endee is open source software licensed under the
-**Apache License 2.0**.
+🔎 Query the System
+python -m research_rag.query
 
-You are free to use, modify, and distribute this software for
-personal, commercial, and production use.
+Example:
 
-See the LICENSE file for full license terms.
+What is the main contribution of the paper?
 
----
+The system will:
 
-## Trademark and Branding
+Embed your query
 
-“Endee” and the Endee logo are trademarks of Endee Labs.
+Perform vector similarity search
 
-The Apache License 2.0 does **not** grant permission to use the Endee name,
-logos, or branding in a way that suggests endorsement or affiliation.
+Retrieve top-k relevant chunks
 
-If you offer a hosted or managed service based on this software, you must:
-- Use your own branding
-- Avoid implying it is an official Endee service
+Display source and text
 
-For trademark or branding permissions, contact: enterprise@endee.io
+🧠 Embedding Model
 
----
+Model used:
 
-## Third-Party Software
+sentence-transformers/all-MiniLM-L6-v2
 
-This project includes or depends on third-party software components that are
-licensed under their respective open source licenses.
+Embedding dimension: 384
 
-Use of those components is governed by the terms and conditions of their
-individual licenses, not by the Apache License 2.0 for this project.
+Fast and lightweight
+
+Suitable for semantic search
+
+📊 Vector Database Configuration
+
+Index name: dash1
+
+Dimension: 384
+
+Similarity: Cosine
+
+Precision: float32
+
+🔥 Features
+
+✔ PDF ingestion pipeline
+✔ Safe overlapping chunking
+✔ Vector embedding storage
+✔ Semantic similarity search
+✔ Local metadata alignment
+✔ Interactive CLI query interface
+
+🛠 Future Improvements
+
+Add LLM-based answer synthesis
+
+Add citation formatting
+
+Build Streamlit web interface
+
+Hybrid search (BM25 + vector)
+
+Add evaluation metrics
+
+📌 Use Cases
+
+Research paper QA assistant
+
+Literature survey automation
+
+Academic knowledge retrieval
+
+Semantic document search
